@@ -147,7 +147,8 @@ Update `EMBEDDING_MODEL` in `chroma_store.py`, then re-run ingestion so the coll
 
 ```json
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "servers": {
     "merchants-dispute-advisor": {
       "command": "uv",
       "args": ["run", "dispute-advisor"],
