@@ -156,5 +156,5 @@ Update `EMBEDDING_MODEL` in `chroma_store.py`, then re-run ingestion so the coll
   }
 }
 ```
-
+---
 For **GitHub Copilot in VS Code**, place this in `.vscode/mcp.json`.
