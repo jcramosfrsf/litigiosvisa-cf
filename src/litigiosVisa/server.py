@@ -6,6 +6,8 @@ from litigiosVisa.dispute_data import (
     get_category_by_id,
     DisputeCategory,
     DISPUTE_CATEGORIES,
+    check_category_interactions,
+    INTERACTION_TYPES,
 )
 
 mcp = FastMCP("litigios-visa")
@@ -102,36 +104,47 @@ def check_interactions(category: list[str]) -> list[dict]:
     Check interactions between dispute categories.
 
     Sometimes multiple dispute categories may apply to the same case.
-    This tool helps identify if there are any conflicts or additional
-    considerations when multiple categories are involved.
+    This tool helps identify if there are conflicts, complementary benefits,
+    or documentation overlaps between categories.
 
     Args:
-        category: List of category IDs to check
+        category: List of category IDs to check (e.g., ["CDT-001", "CDT-004"])
 
     Returns:
-        List of interaction notes between the categories
+        List of interaction results with:
+        - categories: pair of category IDs
+        - category_names: pair of category names
+        - interaction: type (conflict/complementary/overlap/sequential/neutral)
+        - symbol: visual indicator
+        - description: what this interaction means
+        - recommendation: suggested action
+        - action: REMOVE_ONE, FILE_BOTH, COMBINE_DOCS, FILE_IN_ORDER, or INDEPENDENT
     """
     if not category:
-        return [{"message": "No categories provided"}]
+        return [
+            {
+                "error": "No categories provided",
+                "suggestion": "Provide a list of category IDs",
+            }
+        ]
 
-    categories = [
-        get_category_by_id(cat) for cat in category if get_category_by_id(cat)
-    ]
+    if len(category) < 2:
+        return [
+            {
+                "error": "Need at least 2 categories to check interactions",
+                "suggestion": "Provide at least 2 category IDs",
+            }
+        ]
 
-    if len(categories) < 2:
-        return [{"message": "Need at least 2 categories to check interactions"}]
+    interactions = check_category_interactions(category)
 
-    interactions = []
-
-    for i, cat1 in enumerate(categories):
-        for cat2 in categories[i + 1 :]:
-            interactions.append(
-                {
-                    "category_pair": [cat1.category_id, cat2.category_id],
-                    "note": f"'{cat1.name}' and '{cat2.name}' may be filed separately. "
-                    f"Each has its own {cat1.time_limit_days}-day time limit.",
-                }
-            )
+    if not interactions:
+        return [
+            {
+                "error": "No valid categories found",
+                "available": [c.category_id for c in DISPUTE_CATEGORIES],
+            }
+        ]
 
     return interactions
 

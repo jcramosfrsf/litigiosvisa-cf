@@ -5,6 +5,7 @@ from litigiosVisa.dispute_data import (
     search_categories,
     get_category_by_id,
     DISPUTE_CATEGORIES,
+    check_category_interactions,
 )
 
 
@@ -62,5 +63,32 @@ def demo_workflow():
             print(f"    - Obtain {doc}")
 
 
+def demo_interactions():
+    print("\n" + "=" * 60)
+    print("DEMO 2: CHECK INTERACTIONS")
+    print("=" * 60)
+
+    test_cases = [
+        ["CDT-002", "CDT-004"],  # Complementary
+        ["CDT-001", "CDT-003"],  # Conflict
+        ["CDT-002", "CDT-009"],  # Overlap
+        ["CDT-005", "CDT-010"],  # Complementary
+    ]
+
+    for categories in test_cases:
+        print(f"\n  Checking: {categories}")
+        interactions = check_category_interactions(categories)
+
+        for interaction in interactions:
+            print(f"\n  Result:")
+            print(
+                f"    {interaction['symbol']} {interaction['interaction'].upper()}: {interaction['description']}"
+            )
+            print(f"    Categories: {interaction['categories']}")
+            print(f"    Action: {interaction['action']}")
+            print(f"    Recommendation: {interaction['recommendation']}")
+
+
 if __name__ == "__main__":
     demo_workflow()
+    demo_interactions()

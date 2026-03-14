@@ -3,6 +3,119 @@ from dataclasses import dataclass
 from typing import Optional
 
 
+INTERACTION_TYPES = {
+    "conflict": {
+        "symbol": "⚠️",
+        "description": "These categories cannot be filed together",
+        "recommendation": "Choose one category only",
+    },
+    "complementary": {
+        "symbol": "✓",
+        "description": "These categories strengthen each other when filed together",
+        "recommendation": "Consider filing both",
+    },
+    "overlap": {
+        "symbol": "ⓘ",
+        "description": "These categories have overlapping documentation requirements",
+        "recommendation": "Gather combined documentation",
+    },
+    "sequential": {
+        "symbol": "→",
+        "description": "One category should be filed before the other",
+        "recommendation": "File in order of priority",
+    },
+    "neutral": {
+        "symbol": "—",
+        "description": "No significant interaction between these categories",
+        "recommendation": "Can be filed independently",
+    },
+}
+
+INTERACTION_RULES: dict[tuple[str, str], str] = {
+    # Conflicts - cannot file together
+    ("CDT-001", "CDT-003"): "conflict",
+    ("CDT-003", "CDT-001"): "conflict",
+    ("CDT-001", "CDT-002"): "conflict",
+    ("CDT-002", "CDT-001"): "conflict",
+    ("CDT-005", "CDT-006"): "conflict",
+    ("CDT-006", "CDT-005"): "conflict",
+    ("CDT-007", "CDT-005"): "conflict",
+    ("CDT-005", "CDT-007"): "conflict",
+    # Complementary - strengthen each other
+    ("CDT-002", "CDT-004"): "complementary",
+    ("CDT-004", "CDT-002"): "complementary",
+    ("CDT-005", "CDT-010"): "complementary",
+    ("CDT-010", "CDT-005"): "complementary",
+    ("CDT-001", "CDT-004"): "complementary",
+    ("CDT-004", "CDT-001"): "complementary",
+    ("CDT-008", "CDT-003"): "complementary",
+    ("CDT-003", "CDT-008"): "complementary",
+    # Overlap - shared documentation
+    ("CDT-002", "CDT-009"): "overlap",
+    ("CDT-009", "CDT-002"): "overlap",
+    ("CDT-003", "CDT-004"): "overlap",
+    ("CDT-004", "CDT-003"): "overlap",
+    ("CDT-005", "CDT-010"): "overlap",
+    ("CDT-010", "CDT-005"): "overlap",
+    # Sequential - file in order
+    ("CDT-004", "CDT-002"): "sequential",
+    ("CDT-002", "CDT-004"): "sequential",
+}
+
+
+def get_interaction(cat1_id: str, cat2_id: str) -> str:
+    key = (cat1_id.upper(), cat2_id.upper())
+    return INTERACTION_RULES.get(key, "neutral")
+
+
+def check_category_interactions(category_ids: list[str]) -> list[dict]:
+    categories = [
+        get_category_by_id(cat) for cat in category_ids if get_category_by_id(cat)
+    ]
+
+    if len(categories) < 2:
+        return []
+
+    interactions = []
+    seen_pairs = set()
+
+    for i, cat1 in enumerate(categories):
+        for cat2 in categories[i + 1 :]:
+            pair_key = tuple(sorted([cat1.category_id, cat2.category_id]))
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+
+            interaction_type = get_interaction(cat1.category_id, cat2.category_id)
+            interaction_info = INTERACTION_TYPES.get(
+                interaction_type, INTERACTION_TYPES["neutral"]
+            )
+
+            result = {
+                "categories": [cat1.category_id, cat2.category_id],
+                "category_names": [cat1.name, cat2.name],
+                "interaction": interaction_type,
+                "symbol": interaction_info["symbol"],
+                "description": interaction_info["description"],
+                "recommendation": interaction_info["recommendation"],
+            }
+
+            if interaction_type == "conflict":
+                result["action"] = "REMOVE_ONE"
+            elif interaction_type == "complementary":
+                result["action"] = "FILE_BOTH"
+            elif interaction_type == "overlap":
+                result["action"] = "COMBINE_DOCS"
+            elif interaction_type == "sequential":
+                result["action"] = "FILE_IN_ORDER"
+            else:
+                result["action"] = "INDEPENDENT"
+
+            interactions.append(result)
+
+    return interactions
+
+
 @dataclass
 class DisputeCategory:
     category_id: str
