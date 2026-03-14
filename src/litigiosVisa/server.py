@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from fastmcp import FastMCP
 from litigiosVisa.dispute_data import (
     search_categories,
@@ -9,8 +10,11 @@ from litigiosVisa.dispute_data import (
     check_category_interactions,
     INTERACTION_TYPES,
 )
+from litigiosVisa.database import init_database, execute_query, get_table_schema
 
 mcp = FastMCP("litigios-visa")
+
+init_database()
 
 
 @mcp.tool()
@@ -150,65 +154,226 @@ def check_interactions(category: list[str]) -> list[dict]:
 
 
 @mcp.tool()
-def generate_sql_query(intent: str) -> str:
+def generate_sql_query(intent: str) -> dict:
     """
     Generate SQL query from natural language intent.
 
     This is a template-based generator for common SQL queries against
-    the merchant dispute history database.
+    the merchant dispute history database. Returns both the generated
+    SQL and the executed results.
+
+    Available tables:
+    - disputes: dispute_id, merchant_id, cardholder_id, amount, currency,
+                dispute_category, status, reason_code, transaction_date,
+                created_at, resolved_at, outcome
+    - merchants: merchant_id, name, category, country, created_at
+    - transactions: transaction_id, merchant_id, cardholder_id, amount,
+                   currency, transaction_type, status, timestamp
 
     Args:
-        intent: Natural language description of what data to retrieve
+        intent: Natural language description of what data to retrieve.
+                Examples:
+                - "show me recent disputes"
+                - "disputes for Amazon"
+                - "pending disputes over 100 dollars"
+                - "disputes by status approved"
+                - "disputes from January 2026"
 
     Returns:
-        Generated SELECT SQL query
+        Dictionary with generated SQL and optional results
     """
+    if not intent or not intent.strip():
+        return {
+            "error": "Intent cannot be empty",
+            "suggestion": "Provide a description of what data you want to retrieve",
+        }
+
     intent_lower = intent.lower()
+    sql = None
+    explanation = ""
 
-    templates = {
-        "recent_disputes": "SELECT * FROM disputes ORDER BY created_at DESC LIMIT 10",
-        "by_merchant": "SELECT * FROM disputes WHERE merchant_name LIKE '%{merchant}%'",
-        "by_amount": "SELECT * FROM disputes WHERE amount > {min_amount} AND amount < {max_amount}",
-        "by_status": "SELECT * FROM disputes WHERE status = '{status}'",
-        "by_date": "SELECT * FROM disputes WHERE created_at >= '{start_date}' AND created_at <= '{end_date}'",
+    # Priority order - most specific first
+    # 1. Count/summary queries
+    if any(kw in intent_lower for kw in ["count", "total", "how many", "summary"]):
+        if "status" in intent_lower:
+            sql = "SELECT status, COUNT(*) as count FROM disputes GROUP BY status ORDER BY count DESC"
+            explanation = "Count of disputes grouped by status"
+        elif "amount" in intent_lower or "value" in intent_lower:
+            sql = "SELECT SUM(amount) as total_amount, COUNT(*) as total_disputes, AVG(amount) as avg_amount FROM disputes"
+            explanation = "Total amount in dispute"
+        elif "category" in intent_lower:
+            sql = "SELECT dispute_category, COUNT(*) as count FROM disputes GROUP BY dispute_category"
+            explanation = "Count of disputes by category"
+        else:
+            sql = "SELECT COUNT(*) as total FROM disputes"
+            explanation = "Total count of disputes"
+
+    # 2. By outcome
+    elif any(
+        kw in intent_lower for kw in ["outcome", "result", "approved", "rejected"]
+    ):
+        outcome = "approved" if "approved" in intent_lower else "rejected"
+        sql = f"SELECT * FROM disputes WHERE outcome = '{outcome}'"
+        explanation = f"Disputes with outcome: {outcome}"
+
+    # 3. By status
+    elif any(kw in intent_lower for kw in ["pending", "resolved", "investigating"]):
+        status = (
+            "pending"
+            if "pending" in intent_lower
+            else "resolved"
+            if "resolved" in intent_lower
+            else "investigating"
+        )
+        sql = f"SELECT * FROM disputes WHERE status = '{status}'"
+        explanation = f"Disputes with status: {status}"
+
+    # 4. By merchant name
+    elif "amazon" in intent_lower:
+        sql = "SELECT d.*, m.name as merchant_name, m.category as merchant_category FROM disputes d JOIN merchants m ON d.merchant_id = m.merchant_id WHERE m.name LIKE '%Amazon%'"
+        explanation = "Disputes from Amazon merchant"
+    elif "walmart" in intent_lower:
+        sql = "SELECT d.*, m.name as merchant_name FROM disputes d JOIN merchants m ON d.merchant_id = m.merchant_id WHERE m.name LIKE '%Walmart%'"
+        explanation = "Disputes from Walmart merchant"
+    elif "netflix" in intent_lower:
+        sql = "SELECT d.*, m.name as merchant_name FROM disputes d JOIN merchants m ON d.merchant_id = m.merchant_id WHERE m.name LIKE '%Netflix%'"
+        explanation = "Disputes from Netflix merchant"
+    elif "merchant" in intent_lower:
+        sql = "SELECT d.*, m.name as merchant_name FROM disputes d JOIN merchants m ON d.merchant_id = m.merchant_id LIMIT 20"
+        explanation = "Disputes with merchant info"
+
+    # 5. By amount
+    elif any(kw in intent_lower for kw in ["over", "above", "greater than"]) and any(
+        char.isdigit() for char in intent
+    ):
+        import re
+
+        nums = re.findall(r"\d+", intent)
+        if nums:
+            amount = nums[0]
+            sql = f"SELECT * FROM disputes WHERE amount > {amount}"
+            explanation = f"Disputes over ${amount}"
+    elif any(kw in intent_lower for kw in ["under", "below", "less than"]) and any(
+        char.isdigit() for char in intent
+    ):
+        import re
+
+        nums = re.findall(r"\d+", intent)
+        if nums:
+            amount = nums[0]
+            sql = f"SELECT * FROM disputes WHERE amount < {amount}"
+            explanation = f"Disputes under ${amount}"
+
+    # 6. Recent/latest
+    elif any(
+        kw in intent_lower
+        for kw in ["recent", "latest", "newest", "recent disputes", "latest disputes"]
+    ):
+        sql = "SELECT * FROM disputes ORDER BY created_at DESC LIMIT 10"
+        explanation = "10 most recent disputes"
+
+    # 7. By category
+    elif "cdt-" in intent_lower or "category" in intent_lower:
+        import re
+
+        match = re.search(r"(CDT-\d+)", intent.upper())
+        if match:
+            cat = match.group(1)
+            sql = f"SELECT * FROM disputes WHERE dispute_category = '{cat}'"
+            explanation = f"Disputes of category {cat}"
+        else:
+            sql = "SELECT * FROM disputes ORDER BY created_at DESC LIMIT 10"
+            explanation = "Recent disputes"
+
+    # 8. All disputes
+    elif "all" in intent_lower:
+        sql = "SELECT * FROM disputes ORDER BY created_at DESC"
+        explanation = "All disputes"
+
+    # Default
+    else:
+        sql = "SELECT * FROM disputes ORDER BY created_at DESC LIMIT 10"
+        explanation = "10 most recent disputes (default)"
+
+    return {
+        "intent": intent,
+        "generated_sql": sql,
+        "explanation": explanation,
+        "note": "Use execute_sql_query to run this query",
     }
-
-    for key, query in templates.items():
-        if key.replace("_", " ") in intent_lower:
-            return query
-
-    return f"-- Could not generate SQL for: {intent}\n-- Available patterns: recent_disputes, by_merchant, by_amount, by_status, by_date"
 
 
 @mcp.tool()
-def execute_sql_query(sql: str) -> list[dict]:
+def execute_sql_query(sql: str) -> dict:
     """
     Execute a read-only SQL query against the dispute database.
 
     Only SELECT statements are allowed for security.
 
     Args:
-        sql: SQL query to execute
+        sql: SQL query to execute. Can be a full SELECT statement or
+             use 'recent', 'pending', 'approved', 'merchantname', etc.
 
     Returns:
-        List of result rows as dictionaries
+        Dictionary with results or error message. Results include:
+        - rows: list of result rows
+        - count: number of rows returned
+        - sql: the executed query
     """
+    if not sql or not sql.strip():
+        return {"error": "SQL query cannot be empty"}
+
     sql_upper = sql.strip().upper()
 
+    # Security checks
     if not sql_upper.startswith("SELECT"):
-        return [{"error": "Only SELECT queries are allowed for security reasons"}]
-
-    if any(
-        keyword in sql_upper
-        for keyword in ["DROP", "DELETE", "INSERT", "UPDATE", "ALTER", "TRUNCATE"]
-    ):
-        return [{"error": "Only read-only SELECT queries are allowed"}]
-
-    return [
-        {
-            "message": "Database not yet initialized. Run ingestion pipeline to set up SQLite database."
+        return {
+            "error": "Only SELECT queries are allowed for security reasons",
+            "hint": "Use generate_sql_query to create a valid SELECT query",
         }
+
+    forbidden_patterns = [
+        r"\bDROP\b",
+        r"\bDELETE\b",
+        r"\bINSERT\b",
+        r"\bUPDATE\b",
+        r"\bALTER\b",
+        r"\bTRUNCATE\b",
+        r"\bCREATE\b",
+        r"\bGRANT\b",
+        r"\bREVOKE\b",
+        r"\bEXEC\b",
+        r"\bEXECUTE\b",
     ]
+    import re
+
+    for pattern in forbidden_patterns:
+        if re.search(pattern, sql_upper):
+            return {
+                "error": f"Forbidden keyword detected. Only read-only SELECT queries are allowed",
+                "hint": "Avoid DROP, DELETE, INSERT, UPDATE, ALTER, TRUNCATE, CREATE, GRANT, REVOKE",
+            }
+
+    # Execute the query
+    results = execute_query(sql)
+
+    if not results:
+        return {
+            "sql": sql,
+            "rows": [],
+            "count": 0,
+            "message": "Query executed successfully but returned no results",
+        }
+
+    if "error" in results[0]:
+        return {"sql": sql, "error": results[0]["error"]}
+
+    return {
+        "sql": sql,
+        "rows": results,
+        "count": len(results),
+        "message": f"Successfully returned {len(results)} row(s)",
+    }
 
 
 def main():
