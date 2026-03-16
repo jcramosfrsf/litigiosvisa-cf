@@ -97,6 +97,45 @@ check_interactions(["CDT-002", "CDT-004"])
 
 ---
 
+### 6. create_case(scenario: str, category_id: str, merchant_id: str, cardholder_id: str, amount: float, currency: str = "USD", transaction_date: str = "", documentation_status: str = "", notes: str = "")
+**Purpose:** Register a new dispute case in the local VisaCases SQLite database.
+
+**When to use:** After evaluating and deciding to file a dispute, register the case for tracking.
+
+**Input:**
+- scenario: Free text description of the dispute
+- category_id: Dispute category (e.g., "CDT-002")
+- merchant_id: Merchant identifier (e.g., "M001")
+- cardholder_id: Cardholder identifier (e.g., "CH001")
+- amount: Transaction amount
+- currency: Currency code (default: "USD")
+- transaction_date: Date of transaction (YYYY-MM-DD)
+- documentation_status: Available documentation
+- notes: Additional notes
+
+**Output:**
+- case_id: Generated case identifier (e.g., "CASE-001")
+- status: Case status ("registered")
+- created_at: ISO timestamp
+- category: Category name
+
+**Example:**
+```python
+create_case(
+    scenario="Customer charged twice for laptop bag",
+    category_id="CDT-002",
+    merchant_id="M001",
+    cardholder_id="CH001",
+    amount=149.99,
+    currency="USD",
+    transaction_date="2026-01-10",
+    documentation_status="receipt, statement",
+    notes="Two transactions 1 minute apart"
+)
+```
+
+---
+
 ## Workflow
 
 ### Standard Dispute Evaluation
@@ -119,6 +158,8 @@ check_interactions(["CDT-002", "CDT-004"])
 8. EVALUATE: Check conditions met + documentation available
    ↓
 9. OUTPUT: OK (approve) or KO (reject) with reasoning
+   ↓ (if OK)
+10. create_case(...) - Register the case in VisaCases database
 ```
 
 ### Decision Criteria
@@ -164,6 +205,7 @@ check_interactions(["CDT-002", "CDT-004"])
 4. **Query data** - Use SQL tools to verify transaction history
 5. **Time limits** - Most categories have 120 days from transaction
 6. **Documentation** - Ensure required documents are available
+7. **Register cases** - Use `create_case` to register approved disputes in VisaCases database
 
 ---
 

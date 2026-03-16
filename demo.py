@@ -7,6 +7,7 @@ from litigiosVisa.dispute_data import (
     DISPUTE_CATEGORIES,
     check_category_interactions,
 )
+from litigiosVisa.server import create_case, collect_case_data_cli
 
 
 def demo_workflow():
@@ -89,6 +90,46 @@ def demo_interactions():
             print(f"    Recommendation: {interaction['recommendation']}")
 
 
+def demo_create_case():
+    """Demo the create_case function."""
+    print("\n" + "=" * 60)
+    print("DEMO 3: CREATE CASE")
+    print("=" * 60)
+
+    case_result = create_case(
+        scenario="Customer charged twice for laptop bag on Amazon",
+        category_id="CDT-002",
+        merchant_id="M001",
+        cardholder_id="CH001",
+        amount=149.99,
+        currency="USD",
+        transaction_date="2026-01-10",
+        documentation_status="receipt, statement available",
+        notes="Two identical charges, 1 minute apart",
+    )
+
+    print(f"\n  Case Registration Result:")
+    print(f"    Case ID:     {case_result.get('case_id')}")
+    print(f"    Status:      {case_result.get('status')}")
+    print(f"    Category:    {case_result.get('category')}")
+    print(f"    Created:     {case_result.get('created_at')}")
+    print(f"    Message:     {case_result.get('message')}")
+
+    return case_result
+
+
+def demo_collect_case_data_cli():
+    """Demo the CLI case collection function."""
+    print("\n" + "=" * 60)
+    print("DEMO 4: CLI CASE COLLECTION")
+    print("=" * 60)
+    print("\n  This function prompts for case data interactively.")
+    print("  Run with: uv run visa-case-register")
+    print("")
+
+
 if __name__ == "__main__":
     demo_workflow()
     demo_interactions()
+    demo_create_case()
+    demo_collect_case_data_cli()

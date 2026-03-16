@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 visa-dispute = "litigiosVisa.server:main"
+visa-case-register = "litigiosVisa.server:collect_case_data_cli"
 
 [build-system]
 requires = ["hatchling"]

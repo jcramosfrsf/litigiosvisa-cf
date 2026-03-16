@@ -7,8 +7,8 @@ working on this repository.
 
 ## Project purpose
 
-A **read-only MCP server** that surfaces 'Merchants dispute management guidelines' data and a merchant history database as five structured tools. The agent reasoning loop lives entirely in the **MCP client** (GitHub Copilot, Claude Desktop, …).
-This server is the data and retrieval layer only — no LLM calls are made server-side.
+An **MCP server** that surfaces 'Merchants dispute management guidelines' data, a merchant history database, and local Visa case registration as six structured tools. The agent reasoning loop lives entirely in the **MCP client** (GitHub Copilot, Claude Desktop, …).
+This server provides data retrieval and case registration — no LLM calls are made server-side.
 
 ---
 
@@ -42,6 +42,7 @@ data/
 | `check_interactions` | `(category: list[str])` | `list[dict]` — interaction pairs |
 | `generate_sql_query` | `(intent: str)` | `str` — SELECT SQL |
 | `execute_sql_query` | `(sql: str)` | `list[dict]` — result rows |
+| `create_case` | `(scenario, category_id, merchant_id, cardholder_id, amount, currency, transaction_date, documentation_status, notes)` | `dict` — case_id, status, created_at |
 
 All tools are synchronous and return JSON-serialisable values. Do not add `async` to tool functions without updating the FastMCP configuration.
 

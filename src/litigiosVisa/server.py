@@ -10,11 +10,20 @@ from litigiosVisa.dispute_data import (
     check_category_interactions,
     INTERACTION_TYPES,
 )
-from litigiosVisa.database import init_database, execute_query, get_table_schema
+from litigiosVisa.database import (
+    init_database,
+    execute_query,
+    get_table_schema,
+    init_visa_cases_database,
+    insert_visa_case,
+    get_case_by_id,
+    get_all_cases,
+)
 
 mcp = FastMCP("litigios-visa")
 
 init_database()
+init_visa_cases_database()
 
 
 @mcp.tool()
@@ -374,6 +383,167 @@ def execute_sql_query(sql: str) -> dict:
         "count": len(results),
         "message": f"Successfully returned {len(results)} row(s)",
     }
+
+
+@mcp.tool()
+def create_case(
+    scenario: str,
+    category_id: str,
+    merchant_id: str,
+    cardholder_id: str,
+    amount: float,
+    currency: str = "USD",
+    transaction_date: str = "",
+    documentation_status: str = "",
+    notes: str = "",
+) -> dict:
+    """
+    Register a new dispute case in the VisaCases local database.
+
+    Use this tool after evaluating a dispute case to register it for
+    tracking and follow-up purposes.
+
+    Args:
+        scenario: Free text description of the dispute situation
+        category_id: The dispute category ID (e.g., 'CDT-002')
+        merchant_id: The merchant identifier (e.g., 'M001')
+        cardholder_id: The cardholder identifier (e.g., 'CH001')
+        amount: Transaction amount in the specified currency
+        currency: Currency code (default: 'USD')
+        transaction_date: Date of the transaction (YYYY-MM-DD format)
+        documentation_status: Description of available documentation
+        notes: Additional notes about the case
+
+    Returns:
+        Dictionary with:
+        - case_id: Generated case identifier (e.g., 'CASE-001')
+        - status: Case status ('registered')
+        - created_at: ISO timestamp of registration
+    """
+    if not scenario or not scenario.strip():
+        return {"error": "Scenario cannot be empty"}
+
+    if not category_id or not category_id.strip():
+        return {"error": "category_id cannot be empty"}
+
+    if not merchant_id or not merchant_id.strip():
+        return {"error": "merchant_id cannot be empty"}
+
+    if not cardholder_id or not cardholder_id.strip():
+        return {"error": "cardholder_id cannot be empty"}
+
+    if amount is None or amount <= 0:
+        return {"error": "amount must be a positive number"}
+
+    category = get_category_by_id(category_id)
+    if not category:
+        available = [c.category_id for c in DISPUTE_CATEGORIES]
+        return {
+            "error": f"Category '{category_id}' not found",
+            "available_categories": available,
+        }
+
+    result = insert_visa_case(
+        scenario=scenario,
+        category_id=category_id,
+        merchant_id=merchant_id,
+        cardholder_id=cardholder_id,
+        amount=amount,
+        currency=currency,
+        transaction_date=transaction_date,
+        documentation_status=documentation_status,
+        notes=notes,
+    )
+
+    return {
+        "case_id": result["case_id"],
+        "status": result["status"],
+        "created_at": result["created_at"],
+        "message": f"Case {result['case_id']} registered successfully",
+        "category": category.name,
+    }
+
+
+def collect_case_data_cli() -> dict:
+    """
+    Interactive CLI function to collect case data from user input.
+    Prompts for each field and returns the case registration result.
+    """
+    print("\n" + "=" * 50)
+    print("  VISA DISPUTE CASE REGISTRATION")
+    print("=" * 50 + "\n")
+
+    print("Available Categories:")
+    for cat in DISPUTE_CATEGORIES:
+        print(f"  {cat.category_id}: {cat.name}")
+    print()
+
+    scenario = input("Scenario (description of the dispute): ").strip()
+    if not scenario:
+        print("Error: Scenario cannot be empty")
+        return {"error": "Scenario cannot be empty"}
+
+    category_id = input("Category ID (e.g., CDT-002): ").strip().upper()
+    if not category_id:
+        print("Error: Category ID cannot be empty")
+        return {"error": "Category ID cannot be empty"}
+
+    category = get_category_by_id(category_id)
+    if not category:
+        print(f"Error: Category '{category_id}' not found")
+        print(f"Available: {[c.category_id for c in DISPUTE_CATEGORIES]}")
+        return {"error": f"Category '{category_id}' not found"}
+
+    merchant_id = input("Merchant ID (e.g., M001): ").strip()
+    if not merchant_id:
+        print("Error: Merchant ID cannot be empty")
+        return {"error": "Merchant ID cannot be empty"}
+
+    cardholder_id = input("Cardholder ID (e.g., CH001): ").strip()
+    if not cardholder_id:
+        print("Error: Cardholder ID cannot be empty")
+        return {"error": "Cardholder ID cannot be empty"}
+
+    amount_str = input("Amount (e.g., 149.99): ").strip()
+    try:
+        amount = float(amount_str)
+        if amount <= 0:
+            print("Error: Amount must be positive")
+            return {"error": "Amount must be positive"}
+    except ValueError:
+        print("Error: Invalid amount")
+        return {"error": "Invalid amount"}
+
+    currency = input("Currency (default: USD): ").strip() or "USD"
+    transaction_date = input("Transaction Date (YYYY-MM-DD): ").strip()
+    documentation_status = input("Documentation Status: ").strip()
+    notes = input("Notes (optional): ").strip()
+
+    result = create_case(
+        scenario=scenario,
+        category_id=category_id,
+        merchant_id=merchant_id,
+        cardholder_id=cardholder_id,
+        amount=amount,
+        currency=currency,
+        transaction_date=transaction_date,
+        documentation_status=documentation_status,
+        notes=notes,
+    )
+
+    print("\n" + "-" * 50)
+    if "error" in result:
+        print(f"ERROR: {result['error']}")
+    else:
+        print(f"CASE REGISTERED SUCCESSFULLY!")
+        print(f"  Case ID:     {result['case_id']}")
+        print(f"  Status:      {result['status']}")
+        print(f"  Category:    {result['category']}")
+        print(f"  Created:     {result['created_at']}")
+        print(f"  Message:     {result['message']}")
+    print("-" * 50 + "\n")
+
+    return result
 
 
 def main():

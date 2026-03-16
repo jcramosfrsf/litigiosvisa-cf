@@ -3,9 +3,11 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 import os
+import datetime
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 DB_PATH = DATA_DIR / "dispute.db"
+VISA_CASES_DB_PATH = DATA_DIR / "visa_cases.db"
 
 
 def init_database():
@@ -406,3 +408,120 @@ def get_table_schema(table_name: str) -> dict:
     conn.close()
 
     return {"table": table_name, "columns": columns, "row_count": count}
+
+
+def init_visa_cases_database():
+    """Initialize the VisaCases database."""
+    VISA_CASES_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(str(VISA_CASES_DB_PATH))
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS VisaCases (
+            case_id TEXT PRIMARY KEY,
+            scenario TEXT NOT NULL,
+            category_id TEXT NOT NULL,
+            merchant_id TEXT,
+            cardholder_id TEXT,
+            amount REAL,
+            currency TEXT DEFAULT 'USD',
+            transaction_date TEXT,
+            documentation_status TEXT,
+            notes TEXT,
+            status TEXT DEFAULT 'registered',
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def insert_visa_case(
+    scenario: str,
+    category_id: str,
+    merchant_id: str,
+    cardholder_id: str,
+    amount: float,
+    currency: str,
+    transaction_date: str,
+    documentation_status: str,
+    notes: str,
+) -> dict:
+    """Insert a new Visa case into the database."""
+    if not VISA_CASES_DB_PATH.exists():
+        init_visa_cases_database()
+
+    conn = sqlite3.connect(str(VISA_CASES_DB_PATH))
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM VisaCases")
+    case_number = cursor.fetchone()[0] + 1
+    case_id = f"CASE-{case_number:03d}"
+
+    created_at = datetime.datetime.now().isoformat()
+
+    cursor.execute(
+        """INSERT INTO VisaCases 
+           (case_id, scenario, category_id, merchant_id, cardholder_id, amount, 
+            currency, transaction_date, documentation_status, notes, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            case_id,
+            scenario,
+            category_id,
+            merchant_id,
+            cardholder_id,
+            amount,
+            currency,
+            transaction_date,
+            documentation_status,
+            notes,
+            "registered",
+            created_at,
+        ),
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "case_id": case_id,
+        "status": "registered",
+        "created_at": created_at,
+    }
+
+
+def get_case_by_id(case_id: str) -> Optional[dict]:
+    """Retrieve a Visa case by case_id."""
+    if not VISA_CASES_DB_PATH.exists():
+        init_visa_cases_database()
+
+    conn = sqlite3.connect(str(VISA_CASES_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM VisaCases WHERE case_id = ?", (case_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return dict(row)
+    return None
+
+
+def get_all_cases() -> list[dict]:
+    """Retrieve all Visa cases."""
+    if not VISA_CASES_DB_PATH.exists():
+        init_visa_cases_database()
+
+    conn = sqlite3.connect(str(VISA_CASES_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM VisaCases ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]

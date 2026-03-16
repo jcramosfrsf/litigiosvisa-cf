@@ -17,6 +17,7 @@ This project implements an MCP server that helps evaluate whether a Visa dispute
 - **Check Interactions** - Analyze conflicts between multiple dispute categories
 - **Generate SQL Queries** - Convert natural language to SQL for data retrieval
 - **Execute SQL Queries** - Run read-only queries against the dispute database
+- **Create Case** - Register a new dispute case in the local VisaCases database
 
 ## Dispute Categories
 
@@ -112,6 +113,7 @@ Once connected, the following tools are available:
 3. **check_interactions(categories)** - Check for conflicts between categories
 4. **generate_sql_query(intent)** - Generate SQL from natural language
 5. **execute_sql_query(sql)** - Execute a read-only SQL query
+6. **create_case(...)** - Register a new dispute case in the local VisaCases database
 
 ### Example: Dispute Evaluation
 
@@ -210,6 +212,25 @@ uv run visa-dispute
 ```
 
 The server will start on stdio transport, waiting for MCP client connections.
+
+## CLI Case Registration
+
+To register a new case interactively via command line:
+
+```bash
+uv run visa-case-register
+```
+
+This will prompt for:
+- Scenario description
+- Category ID
+- Merchant ID
+- Cardholder ID
+- Amount
+- Currency (default: USD)
+- Transaction Date
+- Documentation Status
+- Notes (optional)
 
 ## Security
 
