@@ -46,7 +46,7 @@ This project implements an MCP server that helps evaluate whether a Visa dispute
 1. Clone the repository and navigate to the project directory:
 
 ```bash
-cd litigiosVisaV2
+cd litigiosvisa-cf
 ```
 
 2. Install dependencies using uv:
