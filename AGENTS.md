@@ -29,6 +29,7 @@ data/
   merchants-dispute-management-guidelines.pdf        ← Source PDF (not committed — add locally)
   chroma/            ← Persisted ChromaDB vector store (generated)
   dispute.db       ← SQLite database (generated)
+  visa_cases.db     ← SQLite database for registered cases (generated)
 ```
 
 ---
@@ -84,6 +85,9 @@ uv run visa-dispute
 
 # Run with FastMCP dev inspector — browser UI on http://localhost:5173
 uv run fastmcp dev src/litigiosVisa/server.py
+
+# Register a case via CLI (interactive prompts)
+uv run visa-case-register
 
 # Lint + format
 uv run ruff check --fix src/

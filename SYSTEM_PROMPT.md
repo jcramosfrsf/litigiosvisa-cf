@@ -207,6 +207,16 @@ create_case(
 6. **Documentation** - Ensure required documents are available
 7. **Register cases** - Use `create_case` to register approved disputes in VisaCases database
 
+## CLI Case Registration
+
+For direct case registration without MCP client, use:
+
+```bash
+uv run visa-case-register
+```
+
+This launches an interactive CLI that prompts for all case fields.
+
 ---
 
 ## Output Format
