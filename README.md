@@ -120,7 +120,7 @@ Once connected, the following tools are available:
 Start a new OpenCode session in the project directory:
 
 ```bash
-opencode litigiosVisaV2
+opencode .
 ```
 
 Load the example case:
