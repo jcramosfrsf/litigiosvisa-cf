@@ -1,5 +1,7 @@
 ## Proyecto Final - Juan Carlos Ramos
 
+**NOTA:** Ver el original **'ProyectoFinal-JCRamos.mkd'** en el directorio de 'documentación' por si el PDF no está bien generado.
+
 Tiempo de Entrega Estimado: el 21/03/2026
 
 **Problema:**   
