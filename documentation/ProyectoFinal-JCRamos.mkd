@@ -1,0 +1,436 @@
+## Proyecto Final - Juan Carlos Ramos
+
+Tiempo de Entrega Estimado: el 21/03/2026
+
+**Problema:**   
+Litigación con tarjetas de crédito. Problemas de operaciones.  
+Se provee de un documento base para disputas de Visa: conjunto de reglas a seguir.
+
+## Ejercicio:
+
+1. Utilizar el documento de disputas
+https://usa.visa.com/content/dam/VCOM/global/support-legal/documents/merchants-dispute-management-guidelines.pdf
+
+2. Crear un 'knowledge base' del documento accesible mediante MCP, debe tener:
+   - un tool para buscar las reglas de visa aplicables a un caso.
+   - un tool para buscar en nuestro wharehouse si el merchant ya ha tenido casos de disputa (cuántos y qué resolución tuvieron)
+
+3. Demostrar su funcionamiento en un cliente MCP (github copilot por ejemplo)
+
+## Insumos
+
+- OpenAI API key
+- csv que ficciona una tabla (o SQLite)
+- caso de disputa en markdown
+- PDF de reglas de visa para disputa
+
+## Requisitos
+- En python (utilizar fastmcp) para MCP server
+- json para lanzar el server MCP, ejemplo:
+    Prompt: give the json that the mcp server should have as an example (assume we're using uv)
+- código en github
+- Resolución/Conversación con copilot en un markdown
+
+---
+
+# Proceso de Solución
+
+## Configuración del Proyecto
+
+### Tools utilizadas: 
+- code: para visualizar y editar el código
+- Github copilot + LLM 'Claude Haiku 4.5' (mientras se tuvo crédito libre)
+- opencode
+
+## Pasos Seguidos 
+
+1. Crear un proyecto python en directorio: ProyectoFinal/litigiosVisaV2
+2. Armar el 'AGENTS.md' con la estructura del proyecto. Tomo como base el provisto en el curso y ajusto para las características del caso. Para esto reviso el documento para entender el problema.
+3. Inicializo el proyecto git:
+
+    ```
+    git init
+    ```
+
+4. Pruebo el uso de 'github cli' para crear el proyecto remoto y vincularlo al repositorio local.
+
+    ```
+      gh auth login
+    ```
+
+    Para realizar el login en github. Sigo las instrucciones.
+   
+    Crear el proyecto 'litigiosvisa-cf'
+
+    ```
+      gh project create --title "litigiosvisa-cf"
+    ```
+
+    **Nota:** no resulto fácil usarlo. Me es más simple hacerlo a modo tradicional, por lo que una vez vinculado el proyecto remoto, todas las actualizaciones al repositorio se hicieron en forma convencional sin usar IA.
+
+    **Repositorio GitHub:** https://github.com/jcramosfrsf/litigiosvisa-cf
+
+5. Se utiliza 'uv' para el proyecto:  
+
+       ```
+       uv init (ubicado en la carpeta del proyecto)
+       ```
+
+       Usando Copilot:  
+       Prompt:  
+
+       ```
+          init uv in this project
+       ```
+
+        --> Se acaba la cuota mensual de mensajes de chat con Copilot. Realizo todo el proyecto con 'opencode'.
+ 
+6. Habilitar venv:
+
+       ```
+       uv venv .venv
+       ```
+
+7. Habilitar el entorno virtual
+
+       ```
+       source .venv/bin/activate
+       ```
+
+## Configuración MCP
+
+Utilizo 'opencode' para realizar la actividad.
+
+El archivo 'AGENTS.md' ya esta creado y listo para usar.  
+Esto define toda la estructura para el proyecto y las tools.  
+
+
+1. Verifico que está 'fastmcp' definido en AGENTES.md
+
+      **PROMPT**: check if fastmcp is defined in AGENTS.md
+
+      Respuesta del opencode:
+
+      ```
+      Thinking: The user wants me to check if "fastmcp" is defined in AGENTS.md. Let me search for this term in the file.  
+      ✱ Grep "fastmcp" in . (2 matches)  
+      Thinking: Yes, fastmcp is defined in AGENTS.md. Let me provide a concise answer.  
+      Yes, fastmcp is defined in AGENTS.md in two places:  
+        1. Line 54: Listed as the MCP server choice under "Technology choices" - described as "Pythonic, minimal boilerplate"  
+        2. Line 85: Used in the dev command uv run fastmcp dev src/litigiosVisa/server.py  
+   ```
+
+      Interpreto que está correcto.
+
+2. Iniciar la estructura del proyecto.
+      En modo 'Build':  
+      **PROMPT**: Scaffold the project, first only tools implementation that return "Message received".
+
+      Resultado: 
+
+      ```
+      Done. Project scaffolded with:  
+       - pyproject.toml: Added fastmcp, chromadb, sqlalchemy, pdfplumber, polars, python-dotenv dependencies + hatch build config  
+       - src/litigiosVisa/server.py: 5 MCP tools returning "Message received":  
+          - search_dispute_categories(scenario: str)  
+          - get_full_dispute_condition(category_id: str)  
+          - check_interactions(category: list[str])  
+          - generate_sql_query(intent: str)  
+          - execute_sql_query(sql: str)  
+      Run with: uv run visa-dispute or uv run fastmcp dev src/litigiosVisa/server.py  
+      ```
+
+      **Prueba**:   
+
+      ```
+       uv run fastmcp dev inspector src/litigiosVisa/server.py
+      ```
+
+   ![Tools Listadas](./ToolsListadas-Reducido.png)
+
+
+3. Agrego el documento de base en 'data/merchants-dispute-management-guidelines.pdf'  
+
+4. Agregar MCP Server  
+
+      **PROMPT**: install the MCP here in opencode via a json.  
+      **PROMPT**: install de litigios-visa MCP server in this project/directory, localy  
+
+      Resultado:  
+
+      ```
+      The MCP server is now installed locally. Configuration updated in ~/.config/opencode/config.toml:  
+      [mcp]  
+      enabled = true  
+      [mcp.servers.litigios-visa]  
+      command = "/home/jcramos/.../litigiosVisaV2/.venv/bin/visa-dispute"  
+      args = []  
+      The server starts successfully on stdio transport. Restart opencode to connect to the litigios-visa    MCP server - you should see the tools:  
+      - search_dispute_categories  
+      - get_full_dispute_condition    
+      - check_interactions  
+      - generate_sql_query  
+      - execute_sql_query  
+      ```
+
+      **Solución 2**: Tuve problemas con el inicio del 'MCP Server' en opencode, y utilicé el mismo opencode para que resolviera el problema.  
+
+      ```
+      Created two configurations:  
+      1. Project-level: .opencode.json with mcpServers  
+      2. Global: ~/.config/opencode/config.toml with [mcp] section  
+
+      Try restarting opencode to see if the MCP server connects. If the project-level config still causes the error, delete it and rely on the global config:  
+      # Remove project-level config to avoid error  
+         $ rm /home/Cursos/IAparaDatos/ProyectoFinal/litigiosVisaV2/.opencode.json  
+      Thinking: Good. Now the project-level config that was causing the error is removed. The global config at ~/.config/opencode/config.toml should work with the MCP server.  
+      Removed the project-level config that was causing the error. The global config at ~/.config/opencode/config.toml should now work. Restart opencode and it should connect to your litigios-visa MCP server.  
+      ```
+
+      Y luego de esto quedó resuelto y pude continuar:
+
+      ```
+      The litigios-visa MCP server is now connected.  
+      Configuration is at ~/.config/opencode/config.json:  
+      {  
+        "$schema": "https://opencode.ai/config.json",  
+        "mcp": {  
+          "litigios-visa": {  
+            "type": "local",  
+            "command": ["/path/to/.venv/bin/visa-dispute"],  
+            "enabled": true  
+          }
+        }
+      }
+
+
+    Restart opencode and you should have access to the 5 tools:  
+       - search_dispute_categories  
+       - get_full_dispute_condition  
+       - check_interactions  
+       - generate_sql_query  
+       - execute_sql_query  
+   ```
+
+5. Agregar la tool 'search_dispute_categories' and 'get_full_dispute_condition'. 
+
+    **PROMPT:** Add the tools 'search_dispute_categories' and 'get_full_dispute_condition'. Assume tha i have you en case of dispute of visa, You acted as if you would call one tool, and then the other, and it gives me an OK/KO on the dispute case.  
+
+    Respuesta: En video 'Videograbación-AddTools1and2.mp4'  
+
+    Ejemplo de uso con tres herramientas:  
+
+    **PROMPT**: Un comerciante reclama que una transacción realizada por la compra de un cliente fue procesada dos veces.  
+
+    Respuesta:  
+
+    ```
+    Thinking: El usuario describe un escenario de disputa: un comerciante reclama que una transacción fue procesada dos veces por la compra de un cliente. Necesito seguir el flujo de razonamiento del agente documentado en AGENTS.md:  
+    1. Primero debo llamar a search_dispute_categories con el escenario descrito  
+    2. Luego, para cada candidato relevante, llamar a get_full_dispute_condition  
+    3. Si hay dos o más categorías, verificar interacciones con check_interactions  
+    4. Si necesito datos específicos del comerciante, generar y ejecutar SQL  
+
+    Empecemos con el primer paso: buscar categorías de disputa relevantes.
+    ⚙ litigios-visa_search_dispute_categories [scenario=Transacción procesada dos veces, cargo duplicado, el mismo monto fue cobrado dos veces]  
+    Thinking: Los resultados no parecen ser los más relevantes para "transacción procesada dos veces" (duplicate charge). Necesito buscar con otras palabras clave o verificar si hay una categoría específica para cargos duplicados. Voy a intentar con un escenario más específico.  
+    ⚙ litigios-visa_search_dispute_categories [scenario=Duplicate charge, charged twice, double charge, same transaction billed twice]  
+    Thinking: Ahora encontré la categoría correcta: CDT-002 "Duplicate Charge". Es la más relevante con score 6. Ahora debo obtener los detalles completos de esta categoría.  
+    ⚙ litigios-visa_get_full_dispute_condition [category_id=CDT-002]  
+    Thinking: Perfecto. Ahora tengo la información completa de la categoría de disputa. La categoría correcta es CDT-002 "Duplicate Charge" (Cargo Duplicado).   
+
+    Resumen para el usuario:  
+    - Categoría: CDT-002 - Duplicate Charge  
+    - Descripción: El tarjetahabiente fue cobrado múltiples veces por la misma transacción  
+    - Condiciones para aplicar:   
+      1. Múltiples cargos aparecen en el estado de cuenta por la misma compra  
+      2. Los montos de los cargos son idénticos o similares  
+      3. Las fechas de las transacciones son iguales o muy cercanas  
+    - Documentación requerida:  
+      - Recibo de la transacción original  
+      - Todos los recibos de cargos duplicados  
+      - Estado de cuenta del tarjetahabiente mostrando los cargos  
+      - Registros de conciliación del comerciante  
+    - Plazo: 120 días  
+    Le informo al usuario sobre esta categoría de disputa.  
+    Categoría identificada: CDT-002 — Cargo Duplicado (Duplicate Charge)  
+    El comerciante puede presentar una disputa bajo esta categoría. Los requisitos son:  
+    Aspecto	Detalle  
+    Descripción	El tarjetahabiente fue cobrado múltiples veces por la misma transacción  
+    Condiciones	
+    1. Múltiples cargos en el estado de cuenta por la misma compra<br>  
+    2. Montos idénticos o similares<br>  
+    3. Fechas iguales o muy cercanas  
+
+    Documentación requerida	 
+    • Recibo de la transacción original<br>  
+    • Todos los recibos de cargos duplicados<br>
+    • Estado de cuenta del tarjetahabiente<br>  
+    • Registros de conciliación del comerciante  
+
+    Plazo	120 días  
+    Recomendación: El comerciante debe presentar los recibos y registros de conciliación que demuestren que solo existía una transacción válida, y los dos cargos fueron un error del sistema o procesador.
+    ```
+
+6. **PROMPT:** How i can implement the tool 'check_interactions'
+
+    Prompt: Build  
+
+    ```
+    Done! The check_interactions tool is now fully implemented.
+    How it works:
+    The tool checks pairs of categories and returns:
+    Interaction	Symbol	Action	Meaning
+    conflict	⚠️	REMOVE_ONE	Cannot file both together
+    complementary	✓	FILE_BOTH	Strengthen each other
+    overlap	ⓘ	COMBINE_DOCS	Shared documentation
+    sequential	→	FILE_IN_ORDER	File in specific order
+    neutral	—	INDEPENDENT	No interaction
+    Examples from demo:
+    - CDT-001 (Not Received) + CDT-003 (Defective) = CONFLICT ⚠️
+    - CDT-002 (Duplicate) + CDT-004 (Credit Not Processed) = SEQUENTIAL →
+    - CDT-005 (Unauthorized) + CDT-010 (Zero Liability) = OVERLAP ⓘ
+    ```
+
+7. Agregar tools 5 y 6.  
+
+    **PROMPT:** Now add the tools 'generate_sql_query' and 'execute_sql_query'. Generate mock data where needed.  
+
+    **Video:** Videograbación-AddTools5and6.mp4
+
+8. Generar SYSTEM_PROMPT.md
+
+    **PROMPT:** Generate a SYSTEM_PROMPT.md for mcp clients to follow and a disputes/dispute_one.md example to test the agent.  
+
+    ```
+    Done! Created two files:
+    1. SYSTEM_PROMPT.md - Agent instructions including:
+        - Role description
+        - All 5 tools with usage examples
+        - Standard workflow
+        - Decision criteria (OK/KO)
+        - Dispute categories reference table
+        - Output format template
+    2. disputes/dispute_one.md - Example case:
+        - Customer scenario: "charged twice for Amazon purchase"
+        - Case details: $149.99, 2 transactions 1 minute apart
+        - Expected workflow with tool calls
+        - Expected decision: OK (approve)
+        - Complete conditions/documentation analysis
+        - Testing instructions
+
+    The example case matches the mock data in the database (DSP001, CH001, Amazon, $149.99, 2 transactions on 2026-01-10).  
+    To test: Present this case to the agent and verify it reaches the same "OK" decision.
+    ```
+
+9. Prueba:
+
+    Iniciado un nuevo opencode:  
+    Prompt: Tell me about this project  
+
+10. Actualizar el Readme.
+
+    **PROMPT:** Update the README.md file with information about this project, how this can be localy deployed by a user, and basic instructions of use, and a example in 'opencode''. Not use emoticons.
+
+    (Prompt: Actualiza el archivo README.md con información sobre de qué se trata este sistema, cómo pude ser desplegado localmente por un usuario, e instrucciones básicas de uso, con un ejemplo en 'opencode'. No utilices emoticons.)
+
+---
+## Programar herramienta adicional
+
+    Objetivo:  
+    Programar la tool 'create_case' que registre los casos en una base de datos local SQLLite 'Visacases'.  
+    Los datos del caso deben ser solicitados por pantalla (inputs simples, sín interfaces gráficas).  
+    Actualiza los casos de pruebas con esta nueva programación.
+
+    1. Agregar la tool 'create_case' que registre los datos necesarios de un caso de disputa de acuerdo a los datos requeridos por las otras tools. Los casos se registran en una base de datos local SQLLite 'VisaCases'. 
+
+        **PROMPT:* Add the tool 'create_case' that records the necessary data of a dispute case according to the data required by the other tools. The cases are registered in a local SQLite database 'VisaCases'.
+
+    Respuesta:
+
+    Implementation complete. Here's a summary of changes:  
+    Database (src/litigiosVisa/database.py)  
+        - Added VISA_CASES_DB_PATH for new SQLite database (data/visa_cases.db)  
+        - Added init_visa_cases_database() - creates VisaCases table  
+        - Added insert_visa_case() - inserts new case, auto-generates CASE-001, CASE-002, etc.  
+        - Added get_case_by_id() and get_all_cases() helper functions  
+            Server (src/litigiosVisa/server.py)
+        - Added create_case tool with parameters:  
+      - scenario, category_id, merchant_id, cardholder_id, amount, currency (default: USD), transaction_date, documentation_status, notes  
+    Documentation  
+        - AGENTS.md: Added to Tool contract table  
+        - README.md: Added to Features and Available Tools  
+        - SYSTEM_PROMPT.md: Added tool documentation + workflow step  
+
+    Test Result
+        create_case(...)  
+        → {'case_id': 'CASE-001', 'status': 'registered', 'created_at': '2026-03-16T13:10:41.926609', 'message': 'Case CASE-001 registered successfully', 'category': 'Duplicate Charge'}  
+
+     **Video:** 'Videograbación-AddBDVisaCase.mp4'  
+
+    2. Ahora, agregar un funcion para solicitar los datos del casopor pantalla (inputs simples, sin interfaces gráficas). Actualiza los casos de pruebas con esta nueva programación.  
+
+    **PROMPT:** Now, add a function to request the case data via the screen (simple inputs, without graphical interfaces). Update de test cases with this new programming. 
+
+    Respuesta:  
+
+    Done! Here's a summary of changes:  
+    Added CLI Case Registration  
+    Function: collect_case_data_cli() in server.py  
+    - Interactive prompts for all case fields  
+    - Shows available categories before input  
+    - Validates inputs (category exists, positive amount, etc.)   
+    New CLI command:  
+    uv run visa-case-register  
+    Test result:  
+    ==================================================  
+      VISA DISPUTE CASE REGISTRATION  
+    ==================================================  
+    Available Categories:  
+      CDT-001: Merchandise/Services Not Received  
+      CDT-002: Duplicate Charge  
+      ...  
+    Scenario (description of the dispute):   
+    ...  
+    Updated Files  
+    1. src/litigiosVisa/server.py - Added collect_case_data_cli() function  
+    2. pyproject.toml - Added entry point visa-case-register  
+    3. demo.py - Added demo_create_case() and demo_collect_case_data_cli()  
+    4. README.md - Added CLI usage documentation  
+    Database Verification  
+    CASE-003 | CDT-002 | M001 | CH001 | $149.99 | registered  
+    CASE-002 | CDT-002 | M001 | CH001 | $149.99 | registered  
+    CASE-001 | CDT-002 | M001 | CH001 | $149.99 | registered  
+
+3. Actualizar AGENTS.mdm, README.md, y SYSTEM_PROMPT.md
+
+    **PROMPT:** if necesary update AGENTS.mdm, README.md, and SYSTEM_PROMPT.md
+
+    Respuesta:
+
+    Updated all three documentation files: >
+    File	|Changes
+    AGENTS.md	|Added visa-case-register command + visa_cases.db to data directory
+    SYSTEM_PROMPT.md	|Added CLI Case Registration section with uv run visa-case-register
+    README.md	|Already had CLI section from previous update
+
+
+    **Video:** 'Videograbación-AddInputCasemp4'
+
+Se prueba seguir el README.md en una instalación limpia y todo funciona.
+
+**Trabajo terminado**
+
+---
+# Referencias del proyecto
+
+El proyecto desesarrollado se encuentra en el repositorio GitHub:  
+
+        https://github.com/jcramosfrsf/litigiosvisa-cf.git  
+
+La documentación del proceso realizado se encuentra en el directorio 'documentation'.
+
+
+
+
+
